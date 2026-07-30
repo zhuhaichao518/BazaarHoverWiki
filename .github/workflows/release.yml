@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore locked dependencies
+        run: dotnet restore --locked-mode --runtime win-x64 -p:SelfContained=true
+
+      - name: Publish self-contained Windows build
+        run: >
+          dotnet publish --configuration Release --runtime win-x64
+          --self-contained true --no-restore
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o artifacts/publish
+
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          $archive = "BazaarHoverWiki-$env:GITHUB_REF_NAME-win-x64.zip"
+          $releaseFiles = @(
+            "artifacts/publish/BazaarHoverWiki.exe",
+            "artifacts/publish/settings.json"
+          )
+          Compress-Archive -Path $releaseFiles -DestinationPath "artifacts/$archive"
+          $hash = (Get-FileHash "artifacts/$archive" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archive" | Set-Content -Encoding ascii artifacts/SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$env:GITHUB_REF_NAME"
+          "artifacts/BazaarHoverWiki-$env:GITHUB_REF_NAME-win-x64.zip"
+          "artifacts/SHA256SUMS.txt"
+          --verify-tag --generate-notes
