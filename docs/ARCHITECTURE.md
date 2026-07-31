@@ -5,14 +5,11 @@ Bazaar Hover Wiki is deliberately small and process-isolated.
 ```text
 The Bazaar window
       │
-      │ Windows screen capture near cursor
+      │ F hotkey → Windows screen capture near cursor
       ▼
 In-memory PNG ──► Windows.Media.Ocr
                        │
-                       │ nearest useful text lines
-                       ▼
-                stability filter
-                       │
+                       │ title, color and geometry scoring
                        ▼
              HTTPS BazaarDB search
                        │
@@ -23,9 +20,10 @@ In-memory PNG ──► Windows.Media.Ocr
 ## Components
 
 - `ScreenCapture`: captures a bounded rectangle around the current cursor. The bitmap remains in memory.
-- `HoverOcrService`: uses installed Windows OCR language packs and ranks recognized lines by cursor distance.
-- `MainWindow`: owns scan scheduling, foreground-game filtering, stability gating and global hotkeys.
-- `WikiWindow`: renders BazaarDB in WebView2 and controls click-through behavior.
+- `HoverOcrService`: uses installed Windows OCR language packs and ranks recognized lines by title-like visual and textual features.
+- `FrameColorMap`: samples OCR bounding boxes and filters blue/cyan interface and effect text.
+- `MainWindow`: owns the manual scan lifecycle and global hotkeys; no background OCR scheduler runs.
+- `WikiWindow`: renders BazaarDB in a non-activating, draggable and resizable WebView2 window.
 - `AppSettings`: loads the small, reviewable JSON configuration.
 
 ## Non-goals

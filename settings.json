@@ -1,14 +1,7 @@
 {
   "wikiSearchUrl": "https://bazaardb.gg/search?q={query}",
-  "scanIntervalMs": 650,
-  "captureWidth": 760,
-  "captureHeight": 320,
-  "minimumStableScans": 2,
-  "onlyWhenGameIsForeground": true,
-  "foregroundProcessNames": [
-    "TheBazaar",
-    "The Bazaar"
-  ],
+  "captureWidth": 1500,
+  "captureHeight": 900,
   "preferredOcrLanguages": [
     "en-US",
     "zh-Hans"

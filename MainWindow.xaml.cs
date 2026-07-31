@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 
 namespace BazaarHoverWiki;
@@ -13,13 +12,12 @@ public partial class MainWindow : Window
     private readonly AppSettings _settings;
     private readonly HoverOcrService _ocr;
     private readonly WikiWindow _wiki;
-    private readonly DispatcherTimer _timer;
     private CancellationTokenSource? _scanCancellation;
-    private bool _scannerEnabled = true;
     private bool _scanRunning;
-    private string _pendingQuery = string.Empty;
-    private string _shownQuery = string.Empty;
-    private int _stableScans;
+    private bool _scanPending;
+    private bool _wikiPositioned;
+    private bool _pluginEnabled = true;
+    private IntPtr _windowHandle;
 
     public MainWindow()
     {
@@ -28,13 +26,7 @@ public partial class MainWindow : Window
         _settings = AppSettings.Load(settingsPath);
         _ocr = new HoverOcrService(_settings.PreferredOcrLanguages);
         _wiki = new WikiWindow(_settings.WikiSearchUrl);
-        _timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(Math.Clamp(_settings.ScanIntervalMs, 300, 5000)),
-        };
-        _timer.Tick += Timer_OnTick;
 
-        GameOnlyCheckBox.IsChecked = _settings.OnlyWhenGameIsForeground;
         OcrLanguageText.Text = _ocr.ActiveLanguages.Count == 0
             ? "OCR：不可用"
             : $"OCR：{string.Join(", ", _ocr.ActiveLanguages)}";
@@ -52,38 +44,36 @@ public partial class MainWindow : Window
         if (_ocr.ActiveLanguages.Count == 0)
         {
             SetStatus("没有可用的 Windows OCR 语言包", false);
-            _scannerEnabled = false;
-            ToggleButton.Content = "继续识别";
+            return;
+        }
+        if (!_pluginEnabled)
+        {
+            SetStatus("F/D 快捷键注册失败 · 按 F9 重试", false);
             return;
         }
 
-        SetStatus("自动识别已开启", true);
-        _timer.Start();
+        SetStatus("手动识别已就绪 · 按 F 开始", true);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         source?.AddHook(WndProc);
-        var handle = source?.Handle ?? IntPtr.Zero;
-        NativeMethods.RegisterHotKey(handle, NativeMethods.HotkeyToggleScanner, NativeMethods.ModNone, NativeMethods.VkF8);
+        _windowHandle = source?.Handle ?? IntPtr.Zero;
+        _pluginEnabled = RegisterActionHotkeys();
         NativeMethods.RegisterHotKey(
-            handle,
-            NativeMethods.HotkeyScanNow,
-            NativeMethods.ModControl | NativeMethods.ModShift,
-            NativeMethods.VkW
+            _windowHandle,
+            NativeMethods.HotkeyTogglePlugin,
+            NativeMethods.ModNoRepeat,
+            NativeMethods.VkF9
         );
-        NativeMethods.RegisterHotKey(handle, NativeMethods.HotkeyToggleWikiInput, NativeMethods.ModNone, NativeMethods.VkF9);
     }
 
     private void OnClosed(object? sender, EventArgs e)
     {
-        _timer.Stop();
         _scanCancellation?.Cancel();
-        var handle = new WindowInteropHelper(this).Handle;
-        NativeMethods.UnregisterHotKey(handle, NativeMethods.HotkeyToggleScanner);
-        NativeMethods.UnregisterHotKey(handle, NativeMethods.HotkeyScanNow);
-        NativeMethods.UnregisterHotKey(handle, NativeMethods.HotkeyToggleWikiInput);
+        UnregisterActionHotkeys();
+        NativeMethods.UnregisterHotKey(_windowHandle, NativeMethods.HotkeyTogglePlugin);
         _wiki.Close();
     }
 
@@ -95,35 +85,108 @@ public partial class MainWindow : Window
         handled = true;
         switch (wParam.ToInt32())
         {
-            case NativeMethods.HotkeyToggleScanner:
-                ToggleScanner();
-                break;
             case NativeMethods.HotkeyScanNow:
-                _ = ScanAsync(force: true);
+                TriggerScan();
                 break;
-            case NativeMethods.HotkeyToggleWikiInput:
-                EnsureWikiVisible();
-                _wiki.ToggleInteractive();
+            case NativeMethods.HotkeyToggleWikiWindow:
+                ToggleWikiWindow();
+                break;
+            case NativeMethods.HotkeyTogglePlugin:
+                TogglePlugin();
                 break;
         }
 
         return IntPtr.Zero;
     }
 
-    private async void Timer_OnTick(object? sender, EventArgs e) => await ScanAsync(force: false);
-
-    private async Task ScanAsync(bool force)
+    private bool RegisterActionHotkeys()
     {
-        if (_scanRunning || (!force && !_scannerEnabled))
+        var scanRegistered = NativeMethods.RegisterHotKey(
+            _windowHandle,
+            NativeMethods.HotkeyScanNow,
+            NativeMethods.ModNoRepeat,
+            NativeMethods.VkF
+        );
+        var wikiRegistered = NativeMethods.RegisterHotKey(
+            _windowHandle,
+            NativeMethods.HotkeyToggleWikiWindow,
+            NativeMethods.ModNoRepeat,
+            NativeMethods.VkD
+        );
+
+        if (scanRegistered && wikiRegistered)
+            return true;
+
+        UnregisterActionHotkeys();
+        return false;
+    }
+
+    private void UnregisterActionHotkeys()
+    {
+        NativeMethods.UnregisterHotKey(_windowHandle, NativeMethods.HotkeyScanNow);
+        NativeMethods.UnregisterHotKey(_windowHandle, NativeMethods.HotkeyToggleWikiWindow);
+    }
+
+    private void TogglePlugin()
+    {
+        if (_pluginEnabled)
+        {
+            _pluginEnabled = false;
+            _scanPending = false;
+            _scanCancellation?.Cancel();
+            UnregisterActionHotkeys();
+            _wiki.Hide();
+            SetStatus("插件已暂停 · 按 F9 恢复", false);
+            return;
+        }
+
+        _pluginEnabled = RegisterActionHotkeys();
+        SetStatus(
+            _pluginEnabled ? "插件已恢复 · 按 F 搜索" : "F/D 快捷键注册失败",
+            _pluginEnabled
+        );
+    }
+
+    private void TriggerScan()
+    {
+        if (_ocr.ActiveLanguages.Count == 0)
+        {
+            SetStatus("没有可用的 Windows OCR 语言包", false);
+            return;
+        }
+
+        if (_scanRunning)
+        {
+            _scanPending = true;
+            _scanCancellation?.Cancel();
+            return;
+        }
+
+        _ = ScanAsync();
+    }
+
+    private void ToggleWikiWindow()
+    {
+        if (_wiki.IsVisible)
+        {
+            _scanPending = false;
+            _scanCancellation?.Cancel();
+            _wiki.Hide();
+            SetStatus("Wiki 已隐藏 · 按 D 重新显示", true);
+            return;
+        }
+
+        EnsureWikiVisible();
+        SetStatus("Wiki 已显示 · 可直接拖动和缩放", true);
+    }
+
+    private async Task ScanAsync()
+    {
+        if (_scanRunning)
             return;
 
         var foreground = NativeMethods.GetForegroundApp();
         ForegroundText.Text = $"前台窗口：{foreground.ProcessName} · {foreground.WindowTitle}";
-        if (!force && GameOnlyCheckBox.IsChecked == true && !IsBazaar(foreground))
-        {
-            SetStatus("等待 The Bazaar 切到前台", true);
-            return;
-        }
 
         _scanRunning = true;
         _scanCancellation?.Cancel();
@@ -148,25 +211,7 @@ public partial class MainWindow : Window
             }
 
             QueryTextBox.Text = best;
-            if (force)
-            {
-                ShowQuery(best);
-                SetStatus($"已识别：{best}", true);
-                return;
-            }
-
-            if (string.Equals(best, _pendingQuery, StringComparison.OrdinalIgnoreCase))
-            {
-                _stableScans++;
-            }
-            else
-            {
-                _pendingQuery = best;
-                _stableScans = 1;
-            }
-
-            if (_stableScans >= Math.Max(1, _settings.MinimumStableScans))
-                ShowQuery(best);
+            ShowQuery(best);
             SetStatus($"已识别：{best}", true);
         }
         catch (OperationCanceledException)
@@ -180,16 +225,12 @@ public partial class MainWindow : Window
         finally
         {
             _scanRunning = false;
+            if (_scanPending)
+            {
+                _scanPending = false;
+                _ = ScanAsync();
+            }
         }
-    }
-
-    private bool IsBazaar(ForegroundApp foreground)
-    {
-        return _settings.ForegroundProcessNames.Any(
-            expected =>
-                foreground.ProcessName.Contains(expected, StringComparison.OrdinalIgnoreCase)
-                || foreground.WindowTitle.Contains(expected, StringComparison.OrdinalIgnoreCase)
-        );
     }
 
     private void ShowQuery(string query)
@@ -197,10 +238,7 @@ public partial class MainWindow : Window
         query = query.Trim();
         if (query.Length < 2)
             return;
-        if (string.Equals(query, _shownQuery, StringComparison.OrdinalIgnoreCase))
-            return;
 
-        _shownQuery = query;
         EnsureWikiVisible();
         _wiki.NavigateTo(query);
     }
@@ -209,14 +247,11 @@ public partial class MainWindow : Window
     {
         if (!_wiki.IsVisible)
             _wiki.Show();
-        _wiki.PositionBeside(Forms.Cursor.Position);
-    }
-
-    private void ToggleScanner()
-    {
-        _scannerEnabled = !_scannerEnabled;
-        ToggleButton.Content = _scannerEnabled ? "暂停识别" : "继续识别";
-        SetStatus(_scannerEnabled ? "自动识别已开启" : "自动识别已暂停", _scannerEnabled);
+        if (!_wikiPositioned)
+        {
+            _wiki.PositionBeside(Forms.Cursor.Position);
+            _wikiPositioned = true;
+        }
     }
 
     private void SetStatus(string text, bool healthy)
@@ -228,8 +263,6 @@ public partial class MainWindow : Window
                 : System.Windows.Media.Color.FromRgb(231, 111, 96)
         );
     }
-
-    private void ToggleButton_OnClick(object sender, RoutedEventArgs e) => ToggleScanner();
 
     private void ShowWikiButton_OnClick(object sender, RoutedEventArgs e) => EnsureWikiVisible();
 
@@ -243,11 +276,4 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void GameOnlyCheckBox_OnChanged(object sender, RoutedEventArgs e)
-    {
-        if (!IsLoaded)
-            return;
-        _pendingQuery = string.Empty;
-        _stableScans = 0;
-    }
 }

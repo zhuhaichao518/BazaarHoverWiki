@@ -6,12 +6,8 @@ namespace BazaarHoverWiki;
 public sealed class AppSettings
 {
     public string WikiSearchUrl { get; set; } = "https://bazaardb.gg/search?q={query}";
-    public int ScanIntervalMs { get; set; } = 650;
-    public int CaptureWidth { get; set; } = 760;
-    public int CaptureHeight { get; set; } = 320;
-    public int MinimumStableScans { get; set; } = 2;
-    public bool OnlyWhenGameIsForeground { get; set; } = true;
-    public string[] ForegroundProcessNames { get; set; } = ["TheBazaar", "The Bazaar"];
+    public int CaptureWidth { get; set; } = 1500;
+    public int CaptureHeight { get; set; } = 900;
     public string[] PreferredOcrLanguages { get; set; } = ["en-US", "zh-Hans"];
 
     public static AppSettings Load(string path)
