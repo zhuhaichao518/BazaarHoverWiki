@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using Microsoft.Web.WebView2.Core;
 
@@ -7,16 +8,21 @@ namespace BazaarHoverWiki;
 public partial class WikiWindow : Window
 {
     private readonly string _wikiSearchUrl;
-    private bool _interactive;
-
-    public bool IsInteractive => _interactive;
+    private Uri? _pendingTarget;
+    private long _navigationSequence;
 
     public WikiWindow(string wikiSearchUrl)
     {
         InitializeComponent();
         _wikiSearchUrl = wikiSearchUrl;
         Loaded += OnLoaded;
-        SourceInitialized += (_, _) => ApplyInputMode();
+        SourceInitialized += OnSourceInitialized;
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs eventArgs)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        NativeMethods.ConfigureOverlayWindow(handle);
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -31,6 +37,7 @@ public partial class WikiWindow : Window
             Browser.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
             Browser.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
             Browser.CoreWebView2.NavigationStarting += Browser_OnNavigationStarting;
+            NavigatePendingTarget();
         }
         catch (Exception exception)
         {
@@ -55,13 +62,22 @@ public partial class WikiWindow : Window
             TitleText.Text = "Wiki 地址无效：只允许 HTTPS";
             return;
         }
-        Browser.Source = target;
+        _pendingTarget = target;
+        NavigatePendingTarget();
     }
 
-    public void ToggleInteractive()
+    private void NavigatePendingTarget()
     {
-        _interactive = !_interactive;
-        ApplyInputMode();
+        if (_pendingTarget is null || Browser.CoreWebView2 is null)
+            return;
+
+        var target = _pendingTarget;
+        _pendingTarget = null;
+        var builder = new UriBuilder(target);
+        var existingQuery = builder.Query.TrimStart('?');
+        var separator = existingQuery.Length == 0 ? string.Empty : "&";
+        builder.Query = $"{existingQuery}{separator}bhw={++_navigationSequence}";
+        Browser.CoreWebView2.Navigate(builder.Uri.AbsoluteUri);
     }
 
     public void PositionBeside(System.Drawing.Point cursor)
@@ -76,14 +92,10 @@ public partial class WikiWindow : Window
         Top = targetTop;
     }
 
-    private void ApplyInputMode()
+    private void Header_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs eventArgs)
     {
-        var handle = new WindowInteropHelper(this).Handle;
-        NativeMethods.SetOverlayInputMode(handle, _interactive);
-        ModeText.Text = _interactive
-            ? "交互模式 · F9 恢复鼠标穿透"
-            : "穿透模式 · F9 可操作网页";
-        ShowActivated = _interactive;
+        if (eventArgs.LeftButton == MouseButtonState.Pressed)
+            DragMove();
     }
 
     private void Browser_OnNavigationStarting(

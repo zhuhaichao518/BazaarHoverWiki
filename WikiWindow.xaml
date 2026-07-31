@@ -11,6 +11,7 @@
         ShowActivated="False"
         ShowInTaskbar="False"
         WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
         AllowsTransparency="False"
         Background="#141923">
     <Border BorderBrush="#D5A44E" BorderThickness="1" Background="#141923">
@@ -21,7 +22,10 @@
                 <RowDefinition Height="30"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="#202838" Padding="12,0">
+            <Border Grid.Row="0"
+                    Background="#202838"
+                    Padding="12,0"
+                    MouseLeftButtonDown="Header_OnMouseLeftButtonDown">
                 <DockPanel LastChildFill="True">
                     <TextBlock x:Name="TitleText"
                                VerticalAlignment="Center"
@@ -32,7 +36,7 @@
                     <TextBlock DockPanel.Dock="Right"
                                VerticalAlignment="Center"
                                Foreground="#AAB4C4"
-                               Text="F9 解锁交互"/>
+                               Text="D 隐藏 · F9 暂停 · 拖动此处移动"/>
                 </DockPanel>
             </Border>
 
@@ -45,16 +49,22 @@
                                    Text="等待识别选项…"/>
                         <TextBlock Margin="0,8,0,0"
                                    Foreground="#929EB1"
-                                   Text="将鼠标停在名称附近，或按 Ctrl+Shift+W"/>
+                                   Text="将鼠标停在名称附近按 F 搜索；按 D 隐藏"/>
                     </StackPanel>
                 </Border>
             </Grid>
 
             <Border Grid.Row="2" Background="#202838" Padding="10,0">
-                <TextBlock x:Name="ModeText"
-                           VerticalAlignment="Center"
-                           Foreground="#9DA8B8"
-                           Text="穿透模式 · F9 可操作网页"/>
+                <Grid>
+                    <TextBlock x:Name="ModeText"
+                               VerticalAlignment="Center"
+                               Foreground="#9DA8B8"
+                               Text="可直接操作网页 · 拖动边缘或右下角缩放"/>
+                    <ResizeGrip Width="18"
+                                Height="18"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"/>
+                </Grid>
             </Border>
         </Grid>
     </Border>

@@ -3,14 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Bazaar Hover Wiki"
         Width="520"
-        Height="410"
+        Height="380"
         MinWidth="470"
-        MinHeight="380"
+        MinHeight="350"
         Background="{StaticResource PanelBrush}"
+        ShowActivated="False"
         WindowStartupLocation="CenterScreen">
     <Grid Margin="22">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -73,30 +73,20 @@
                        TextTrimming="CharacterEllipsis"/>
         </StackPanel>
 
-        <CheckBox x:Name="GameOnlyCheckBox"
-                  Grid.Row="3"
-                  Margin="0,15,0,0"
-                  Content="仅在 The Bazaar 位于前台时自动识别"
-                  Checked="GameOnlyCheckBox_OnChanged"
-                  Unchecked="GameOnlyCheckBox_OnChanged"/>
-
-        <Border Grid.Row="4"
+        <Border Grid.Row="3"
                 Margin="0,16,0,0"
                 Padding="13"
                 CornerRadius="7"
                 Background="#111722">
             <StackPanel>
                 <TextBlock FontWeight="SemiBold" Text="快捷键"/>
-                <TextBlock Margin="0,7,0,0" Foreground="{StaticResource MutedBrush}" Text="F8　暂停/继续自动识别"/>
-                <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedBrush}" Text="Ctrl+Shift+W　立即识别鼠标附近"/>
-                <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedBrush}" Text="F9　切换 Wiki 窗口鼠标穿透"/>
+                <TextBlock Margin="0,7,0,0" Foreground="{StaticResource MutedBrush}" Text="F　识别鼠标附近并搜索 Wiki"/>
+                <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedBrush}" Text="D　显示/隐藏 Wiki 窗口"/>
+                <TextBlock Margin="0,3,0,0" Foreground="{StaticResource MutedBrush}" Text="F9　暂停/恢复插件（释放 F、D）"/>
             </StackPanel>
         </Border>
 
-        <DockPanel Grid.Row="5" Margin="0,18,0,0">
-            <Button x:Name="ToggleButton"
-                    Content="暂停识别"
-                    Click="ToggleButton_OnClick"/>
+        <DockPanel Grid.Row="4" Margin="0,18,0,0">
             <Button Content="显示 Wiki 窗口"
                     Click="ShowWikiButton_OnClick"/>
             <TextBlock x:Name="OcrLanguageText"

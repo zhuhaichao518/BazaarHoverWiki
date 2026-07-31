@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>BazaarHoverWiki</AssemblyName>
     <RootNamespace>BazaarHoverWiki</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>zhuhaichao518 and contributors</Authors>
     <Description>A minimal, non-invasive OCR companion overlay for The Bazaar.</Description>
     <RepositoryUrl>https://github.com/zhuhaichao518/BazaarHoverWiki</RepositoryUrl>

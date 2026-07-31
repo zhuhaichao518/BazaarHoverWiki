@@ -24,6 +24,7 @@
 - The manifest requests `asInvoker`; elevation is not required.
 - Capture dimensions are bounded and screenshots are never persisted.
 - No HTTP client uploads screenshots or OCR text.
+- The Wiki overlay is excluded from local screen capture and does not activate over the game.
 - WebView2 disables host objects, password saving, autofill and developer tools.
 - Navigation outside BazaarDB HTTPS origins is cancelled.
 - GitHub Actions builds from a locked NuGet dependency graph.

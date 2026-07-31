@@ -6,22 +6,20 @@ namespace BazaarHoverWiki;
 
 internal static class NativeMethods
 {
-    public const int HotkeyToggleScanner = 0xB401;
     public const int HotkeyScanNow = 0xB402;
-    public const int HotkeyToggleWikiInput = 0xB403;
+    public const int HotkeyToggleWikiWindow = 0xB404;
+    public const int HotkeyTogglePlugin = 0xB405;
 
-    public const uint ModNone = 0x0000;
-    public const uint ModControl = 0x0002;
-    public const uint ModShift = 0x0004;
-    public const uint VkF8 = 0x77;
+    public const uint ModNoRepeat = 0x4000;
+    public const uint VkD = 0x44;
+    public const uint VkF = 0x46;
     public const uint VkF9 = 0x78;
-    public const uint VkW = 0x57;
 
     public const int WmHotkey = 0x0312;
     private const int GwlExStyle = -20;
-    private const int WsExTransparent = 0x00000020;
     private const int WsExToolWindow = 0x00000080;
     private const int WsExNoActivate = 0x08000000;
+    private const uint WdaExcludeFromCapture = 0x00000011;
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -46,6 +44,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     private static extern int SetWindowLong(IntPtr hWnd, int index, int newStyle);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint affinity);
+
     public static ForegroundApp GetForegroundApp()
     {
         var handle = GetForegroundWindow();
@@ -67,25 +69,14 @@ internal static class NativeMethods
         }
     }
 
-    public static void SetOverlayInputMode(IntPtr handle, bool interactive)
+    public static bool ConfigureOverlayWindow(IntPtr handle)
     {
         if (handle == IntPtr.Zero)
-            return;
+            return false;
 
         var style = GetWindowLong(handle, GwlExStyle);
-        style |= WsExToolWindow;
-        if (interactive)
-        {
-            style &= ~WsExTransparent;
-            style &= ~WsExNoActivate;
-        }
-        else
-        {
-            style |= WsExTransparent;
-            style |= WsExNoActivate;
-        }
-
-        SetWindowLong(handle, GwlExStyle, style);
+        SetWindowLong(handle, GwlExStyle, style | WsExToolWindow | WsExNoActivate);
+        return SetWindowDisplayAffinity(handle, WdaExcludeFromCapture);
     }
 }
 
